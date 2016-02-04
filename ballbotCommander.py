@@ -13,7 +13,7 @@ import PyQt4.QtCore as QtCore
 from PyQt4.QtCore import Qt, QThread, SIGNAL, QTimer, QDateTime
 import PyQt4.QtGui as QtGui
 from OpenGL.GL import *
-from OpenGL.GLU import *
+#from OpenGL.GLU import *
 from PyQt4.QtOpenGL import *
 import os
 import time
@@ -364,6 +364,7 @@ class MainWindow(TemplateBaseClass):
 
 	def connectToPort(self, portName):
 		retry = self.portTimer.isActive()
+		print("Retry: %s" % str(retry))
 		# make sure timer doesn't start multiple attempts at connecting at the same time
 		self.portTimer.stop()
 
@@ -631,6 +632,7 @@ class SerialThread(QThread):
 				except:
 					self.emit(SIGNAL('append_console_err(QString)'), "Error reading from serial\n")
 					self.enabled = False
+					self.emit(SIGNAL('serial_restart_mode(QString)'), self.portName)
 				if len(self.serParser.consoleBuff) > 0:
 					self.emit(SIGNAL('append_console(QString)'), self.serParser.consoleBuff[1:])
 					self.serParser.consoleBuff = ""
@@ -642,7 +644,6 @@ class SerialThread(QThread):
 					self.serParser.newData = []
 
 			self.emit(SIGNAL('append_console_err(QString)'), "Closing serial port\n")
-			self.emit(SIGNAL('serial_restart_mode(QString)'), self.portName)
 			self.serParser.ser.close()
 			self.serParser.ser = None
 			self.emit(SIGNAL('append_console_err(QString)'), "Closing serial thread\n")
