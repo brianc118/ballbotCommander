@@ -20,7 +20,7 @@ import time
 import datetime
 
 about = "ballbotCommander by Brian Chen"
-version = "0.1"
+version = "0.3"
 
 pg.mkQApp()
 path = os.path.dirname(os.path.abspath(__file__))
