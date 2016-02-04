@@ -12,6 +12,9 @@ import numpy as np
 import PyQt4.QtCore as QtCore
 from PyQt4.QtCore import Qt, QThread, SIGNAL, QTimer, QDateTime
 import PyQt4.QtGui as QtGui
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from PyQt4.QtOpenGL import *
 import os
 import time
 import datetime
@@ -57,6 +60,95 @@ class AboutDialog(QtGui.QDialog):
 		layout.addWidget(self.label)
 		layout.addWidget(self.label2)
 		
+class glCubeWidget(QGLWidget):
+	def __init__(self, parent):
+		QGLWidget.__init__(self, parent)
+		#self.setMinimumSize(1000, 800)
+		self.initialised = 0
+		self.x_axis = 0
+		self.y_axis = 0
+		self.z_axis = 0
+
+	def paintGL(self):
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+ 
+		glLoadIdentity()
+		glTranslatef(0.0,0.0,-6.0)
+
+		glRotatef(self.x_axis,1.0,0.0,0.0)
+		glRotatef(self.y_axis,0.0,1.0,0.0)
+		glRotatef(self.z_axis,0.0,0.0,1.0)
+ 
+		# Draw Cube (multiple quads)
+		glBegin(GL_QUADS)
+ 
+		glColor3f(0.0,1.0,0.0)
+		glVertex3f( 1.0, 1.0,-1.0)
+		glVertex3f(-1.0, 1.0,-1.0)
+		glVertex3f(-1.0, 1.0, 1.0)
+		glVertex3f( 1.0, 1.0, 1.0) 
+ 
+		glColor3f(1.0,0.0,0.0)
+		glVertex3f( 1.0,-1.0, 1.0)
+		glVertex3f(-1.0,-1.0, 1.0)
+		glVertex3f(-1.0,-1.0,-1.0)
+		glVertex3f( 1.0,-1.0,-1.0) 
+ 
+		glColor3f(0.0,1.0,0.0)
+		glVertex3f( 1.0, 1.0, 1.0)
+		glVertex3f(-1.0, 1.0, 1.0)
+		glVertex3f(-1.0,-1.0, 1.0)
+		glVertex3f( 1.0,-1.0, 1.0)
+ 
+		glColor3f(1.0,1.0,0.0)
+		glVertex3f( 1.0,-1.0,-1.0)
+		glVertex3f(-1.0,-1.0,-1.0)
+		glVertex3f(-1.0, 1.0,-1.0)
+		glVertex3f( 1.0, 1.0,-1.0)
+ 
+		glColor3f(0.0,0.0,1.0)
+		glVertex3f(-1.0, 1.0, 1.0) 
+		glVertex3f(-1.0, 1.0,-1.0)
+		glVertex3f(-1.0,-1.0,-1.0) 
+		glVertex3f(-1.0,-1.0, 1.0) 
+ 
+		glColor3f(1.0,0.0,1.0)
+		glVertex3f( 1.0, 1.0,-1.0) 
+		glVertex3f( 1.0, 1.0, 1.0)
+		glVertex3f( 1.0,-1.0, 1.0)
+		glVertex3f( 1.0,-1.0,-1.0)
+
+		glEnd()
+
+	def initializeGL(self):
+		glShadeModel(GL_FLAT)
+		glEnable(GL_DEPTH_TEST)
+		glEnable(GL_CULL_FACE)
+		glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST) 
+
+		glClearColor(0.0, 0.0, 0.0, 0.0)
+		glClearDepth(1.0) 
+		glDepthFunc(GL_LESS)
+		glEnable(GL_DEPTH_TEST)
+		glShadeModel(GL_SMOOTH)   
+		glMatrixMode(GL_PROJECTION)
+		glLoadIdentity()
+		glOrtho(-2, +2, +2, -2, 4.0, 15.0)
+		glMatrixMode(GL_MODELVIEW)
+
+	def resizeGL(self, width, height):
+		side = min(width, height)
+		if side < 0:
+			return
+		x = round((width - side) / 2)
+		y = round((height - side) / 2)
+		
+		glViewport(x, y, side, side)
+
+	def changeAngles(self, x, y, z):
+		self.x_axis = x
+		self.y_axis = y
+		self.z_axis = z
 
 class MainWindow(TemplateBaseClass):  
 	procEnd = QtCore.pyqtSignal()
@@ -112,7 +204,14 @@ class MainWindow(TemplateBaseClass):
 		self.ui.clearGraphButton.clicked.connect(self.clearPlot)
 		self.ui.enableRCCheckBox.toggled.connect(self.toggleRC)
 		self.ui.actionAbout.triggered.connect(self.about)
+		self.ui.saveLegendButton.clicked.connect(self.saveLegend)
+		self.ui.loadLegendButton.clicked.connect(self.loadLegend)
 		# self.ui.MyPlotWidget.addLegend()
+
+		# Create glCubeWidget
+		self.ui.cubeWidget = glCubeWidget(self)
+		self.ui.horizontalLayout_2.addWidget(self.ui.cubeWidget)
+		
 
 		# Graph listview
 		self.listViewModel = QtGui.QStandardItemModel()
@@ -131,6 +230,38 @@ class MainWindow(TemplateBaseClass):
 		self.show()
 
 		self.listPorts()
+
+	def saveLegend(self):
+		import pickle
+
+		saveFilePath = QtGui.QFileDialog.getSaveFileName(
+			self, "Save Legend", "legend.lgd", filter ="lgd (*.lgd *.)")
+		print(saveFilePath)
+		filehandler = open(saveFilePath, 'wb') 
+		pickle.dump((self.names, self.curveStates, self.curveColors), filehandler) 
+		filehandler.close()
+
+	def loadLegend(self):
+		import pickle
+
+		readFilePath = QtGui.QFileDialog.getOpenFileName(
+			self, "Open Legend", filter ="lgd (*.lgd *.)")
+		print(readFilePath)
+		filehandler = open(readFilePath, 'rb') 
+		(temp_names, temp_curveStates, temp_curveColors) = pickle.load(filehandler)
+		filehandler.close()
+		print(temp_curveStates)
+
+		if temp_names == self.names:
+			#self.curveStates = temp_curveStates
+			self.curveColors = temp_curveColors
+			for i in range(len(self.nameCheckItems)):
+				state = Qt.Checked
+				if temp_curveStates[i] is False:
+					state = Qt.Unchecked
+				self.nameCheckItems[i].setCheckState(state)
+				self.nameCheckItems[i].setBackground(temp_curveColors[i])
+
 
 	def about(self):
 		my_dialog = AboutDialog()
@@ -280,8 +411,6 @@ class MainWindow(TemplateBaseClass):
 		self.connect(self.serThread, SIGNAL("serial_restart_mode(QString)"), self.connectToPortPeriodic)
 		self.serThread.start()
 
-		time.sleep(0.5)
-
 		self.plotTimer.start(30)  # 20Hz timer
 
 	def receiveNewData(self, myNewData):	
@@ -331,28 +460,37 @@ class MainWindow(TemplateBaseClass):
 				self.curves.append(curve)
 				self.curveStates.append(True)
 				
+		if self.ui.tabWidget.currentIndex() == 0 and self.dataInitialised:
+			self.ui.cubeWidget.changeAngles(self.data[1][-1],0,self.data[2][-1])
+			self.ui.cubeWidget.updateGL()
+			self.ui.statusBarLabelPlotFps.setText("Drawing cube at %.0f fps" % self.plotFpsObj.update())
+		else:
+			self.ui.statusBarLabelPlotFps.setText("Plotting at 0 fps")
 
-		if self.ui.tabWidget.currentIndex() == 1:
+		if self.ui.tabWidget.currentIndex() == 1 and self.dataInitialised:
 			for i in range(self.dataColumns):
-				if self.nameCheckItems[i].checkState() == Qt.Checked:
+				if self.nameCheckItems[i].checkState() == Qt.Checked:					
 					# add curve if not there already
 					if self.curveEnabled(self.nameCheckItems[i].text()) is False:
 						self.ui.MyPlotWidget.addItem(self.curves[i])
 						self.curveStates[i] = True
+						print("adding curve")
 
 					if (len(self.data[0]) == len(self.data[i+1])):
 						self.curves[i].setData(self.data[0][-10000:],self.data[i+1][-10000:])
-				else:
+				else:					
 					# remove curve if not already
 					if self.curveEnabled(self.nameCheckItems[i].text()):
 						self.ui.MyPlotWidget.removeItem(self.curves[i])
 						self.curveStates[i] = False
+						print("removing curve")
 
 			
 			self.ui.statusBarLabelPlotFps.setText("Plotting at %.0f fps" % self.plotFpsObj.update())
+		
 
-			if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
-				QtGui.QApplication.processEvents()
+		if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
+			QtGui.QApplication.processEvents()
 
 	def sendText(self, textOut):
 		if self.serThread is None:
