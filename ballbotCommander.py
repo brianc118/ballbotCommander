@@ -21,6 +21,8 @@ import datetime
 
 about = "ballbotCommander by Brian Chen"
 version = "0.3"
+plotMinFramerate = 15
+samplesToPlot = 10000
 
 pg.mkQApp()
 path = os.path.dirname(os.path.abspath(__file__))
@@ -453,6 +455,7 @@ class MainWindow(TemplateBaseClass):
 		return False
 
 	def plot(self):
+		global samplesToPlot
 		if len(self.curves) <= 0 and self.dataInitialised:
 			# initialise curves
 			for i in range(self.dataColumns):
@@ -468,7 +471,7 @@ class MainWindow(TemplateBaseClass):
 		else:
 			self.ui.statusBarLabelPlotFps.setText("Plotting at 0 fps")
 
-		if self.ui.tabWidget.currentIndex() == 1 and self.dataInitialised:
+		if self.ui.tabWidget.currentIndex() == 1 and self.dataInitialised and self.ui.graphEnabledCheckBox.checkState() == Qt.Checked:
 			for i in range(self.dataColumns):
 				if self.nameCheckItems[i].checkState() == Qt.Checked:					
 					# add curve if not there already
@@ -478,7 +481,7 @@ class MainWindow(TemplateBaseClass):
 						print("adding curve")
 
 					if (len(self.data[0]) == len(self.data[i+1])):
-						self.curves[i].setData(self.data[0][-10000:],self.data[i+1][-10000:])
+						self.curves[i].setData(self.data[0][-samplesToPlot:],self.data[i+1][-samplesToPlot:])
 				else:					
 					# remove curve if not already
 					if self.curveEnabled(self.nameCheckItems[i].text()):
@@ -486,10 +489,21 @@ class MainWindow(TemplateBaseClass):
 						self.curveStates[i] = False
 						print("removing curve")
 
-			
-			self.ui.statusBarLabelPlotFps.setText("Plotting at %.0f fps" % self.plotFpsObj.update())
-		
+			framerate = self.plotFpsObj.update()
+			self.ui.statusBarLabelPlotFps.setText("Plotting at %.0f fps %d" % (framerate, samplesToPlot))
 
+			if framerate < plotMinFramerate:
+				samplesToPlot = samplesToPlot - int(plotMinFramerate - framerate)**3
+
+			if framerate > 1*plotMinFramerate:
+				samplesToPlot = samplesToPlot - int(plotMinFramerate - framerate)**3
+
+			if samplesToPlot < 500:
+				samplesToPlot = 500
+			
+			if samplesToPlot > len(self.data[0]):
+				samplesToPlot = len(self.data[0])
+			samplesToPlot = 200
 		if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
 			QtGui.QApplication.processEvents()
 
